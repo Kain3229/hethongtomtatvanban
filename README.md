@@ -50,6 +50,7 @@ streamlit run app.py
 
 - Ứng dụng đã dùng `st.cache_resource` để tránh tải lại mô hình không cần thiết
 - `requirements.txt` đã được làm gọn để build ổn định hơn trên Linux của Streamlit Cloud
+- `torch` đã được nâng lên bản tương thích với Python mặc định hiện tại của Streamlit Community Cloud
 - Mô hình mặc định nên dùng là `t5-small` để giảm nguy cơ thiếu RAM khi deploy
 
 ### Cách deploy
@@ -70,6 +71,8 @@ streamlit run app.py
 ### Nếu deploy bị lỗi
 
 - Kiểm tra lại `requirements.txt`
+- Nếu log báo không tìm thấy `torch==2.2.2`, nguyên nhân thường là app đang build với Python mặc định mới hơn, trong khi bản `torch` đó không có wheel tương ứng
+- Trong màn hình deploy của Streamlit, vào `Advanced settings` và chọn `Python 3.11` nếu bạn muốn giữ dependency cũ; với repo hiện tại thì có thể để Python mặc định vì `torch` đã được cập nhật
 - Xác nhận repo không chứa `venv/`, `__pycache__/`, hoặc file cache lớn
 - Nếu app bị crash khi tải model, chuyển về `t5-small`
 - Nếu build timeout, redeploy lại sau khi app cache xong model nhẹ hơn
