@@ -44,6 +44,36 @@ streamlit run app.py
 
 ⚠️ **Lần Chạy Đầu Tiên**: Ứng dụng sẽ tự động download mô hình AI (~800MB - 5GB tùy mô hình), nên cần kết nối internet
 
+## ☁️ Deploy Lên Streamlit Cloud
+
+### Cấu hình đã chuẩn bị
+
+- Ứng dụng đã dùng `st.cache_resource` để tránh tải lại mô hình không cần thiết
+- `requirements.txt` đã được làm gọn để build ổn định hơn trên Linux của Streamlit Cloud
+- Mô hình mặc định nên dùng là `t5-small` để giảm nguy cơ thiếu RAM khi deploy
+
+### Cách deploy
+
+1. Đẩy source code lên GitHub, **không** đẩy thư mục `venv/`
+2. Vào Streamlit Community Cloud: `https://share.streamlit.io/`
+3. Chọn repo này
+4. Điền file chính là `app.py`
+5. Deploy
+
+### Khuyến nghị khi chạy trên cloud
+
+- Nên dùng `t5-small` làm lựa chọn chính
+- `facebook/bart-base` có thể chạy nhưng chậm hơn và tốn RAM hơn
+- `facebook/bart-large-cnn` dễ vượt giới hạn tài nguyên của gói miễn phí
+- Lần chạy đầu sẽ mất thời gian vì phải tải model từ Hugging Face
+
+### Nếu deploy bị lỗi
+
+- Kiểm tra lại `requirements.txt`
+- Xác nhận repo không chứa `venv/`, `__pycache__/`, hoặc file cache lớn
+- Nếu app bị crash khi tải model, chuyển về `t5-small`
+- Nếu build timeout, redeploy lại sau khi app cache xong model nhẹ hơn
+
 ## 📖 Hướng Dẫn Sử Dụng
 
 ### 🌐 Sử Dụng Giao Diện Web (Khuyến Khích)
@@ -172,7 +202,6 @@ text_summarization_system/
 | **nltk** | 3.8.1 | Xử lý ngôn ngữ (sentence tokenize) |
 | **sentencepiece** | 0.1.99 | Sub-word tokenization |
 | **requests** | 2.31.0 | HTTP requests |
-| **pyperclip** | 1.8.2 | Copy/paste hỗ trợ |
 
 ## 🔬 Cách Sử Dụng Nâng Cao
 

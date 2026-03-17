@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt')
+    nltk.download('punkt', quiet=True)
 
 
 class TextSummarizer:
@@ -34,14 +34,21 @@ class TextSummarizer:
             max_tokens: Số token tối đa mỗi chunk (mặc định: 1024)
         """
         self.model_name = model_name
-        self.max_tokens = max_tokens
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         logger.info(f"Đang tải mô hình: {model_name}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.max_tokens = min(max_tokens, self._get_model_token_limit())
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
         self.model.to(self.device)
+        self.model.eval()
         logger.info(f"Mô hình đã tải trên thiết bị: {self.device}")
+
+    def _get_model_token_limit(self) -> int:
+        model_limit = getattr(self.tokenizer, 'model_max_length', self.max_tokens)
+        if not isinstance(model_limit, int) or model_limit <= 0 or model_limit > 100000:
+            return self.max_tokens
+        return model_limit
     
     def count_tokens(self, text: str) -> int:
         """
@@ -115,6 +122,7 @@ class TextSummarizer:
         
         return chunks
     
+    @torch.inference_mode()
     def summarize_single(self, text: str, max_length: int = 150, min_length: int = 50) -> str:
         """
         Tóm tắt một chunk văn bản đơn.
@@ -127,7 +135,12 @@ class TextSummarizer:
         Returns:
             Văn bản được tóm tắt
         """
-        inputs = self.tokenizer.encode(text, return_tensors="pt", max_length=1024, truncation=True)
+        inputs = self.tokenizer.encode(
+            text,
+            return_tensors="pt",
+            max_length=self.max_tokens,
+            truncation=True
+        )
         inputs = inputs.to(self.device)
         
         summary_ids = self.model.generate(

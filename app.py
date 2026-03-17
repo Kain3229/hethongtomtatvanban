@@ -6,11 +6,27 @@ Provides a user-friendly interface for text summarization with chunking support
 import streamlit as st
 from summarizer import TextSummarizer
 import time
-try:
-    import pyperclip
-    HAS_CLIPBOARD = True
-except ImportError:
-    HAS_CLIPBOARD = False
+
+
+MODEL_OPTIONS = {
+    "t5-small": {
+        "label": "t5-small",
+        "description": "Nhe nhat va phu hop nhat de deploy tren Streamlit Cloud"
+    },
+    "facebook/bart-base": {
+        "label": "facebook/bart-base",
+        "description": "Chat luong tot hon nhung cham hon va ton RAM hon"
+    },
+    "facebook/bart-large-cnn": {
+        "label": "facebook/bart-large-cnn",
+        "description": "Rat nang, de vuot gioi han tai nguyen tren cloud"
+    }
+}
+
+
+@st.cache_resource(show_spinner=False)
+def load_summarizer(model_name: str, max_tokens: int) -> TextSummarizer:
+    return TextSummarizer(model_name=model_name, max_tokens=max_tokens)
 
 # Page configuration
 st.set_page_config(
@@ -155,13 +171,13 @@ elif page == "🔧 Công Cụ":
         
         model_option = st.selectbox(
             "Chọn Mô Hình",
-            [
-                "t5-small",
-                "facebook/bart-base",
-                "facebook/bart-large-cnn"
-            ],
+            list(MODEL_OPTIONS.keys()),
             index=0
         )
+
+        st.caption(MODEL_OPTIONS[model_option]["description"])
+        if model_option != "t5-small":
+            st.warning("Streamlit Cloud chay on nhat voi t5-small. Hai mo hinh BART co the tai cham hoac het RAM.")
         
         st.markdown("---")
         
@@ -223,10 +239,7 @@ elif page == "🔧 Công Cụ":
                 status_text.text(f"⏳ Đang tải {model_option}...")
                 progress_bar.progress(30)
                 
-                st.session_state.summarizer = TextSummarizer(
-                    model_name=model_option,
-                    max_tokens=max_tokens
-                )
+                st.session_state.summarizer = load_summarizer(model_option, max_tokens)
                 
                 progress_bar.progress(80)
                 st.session_state.model_loaded = True
@@ -234,6 +247,11 @@ elif page == "🔧 Công Cụ":
                 status_text.empty()
                 progress_bar.empty()
                 st.success(f"✅ {model_option} đã tải thành công!")
+                if st.session_state.summarizer.max_tokens != max_tokens:
+                    st.info(
+                        f"Model nay chi ho tro toi da {st.session_state.summarizer.max_tokens} token moi chunk. "
+                        "Gia tri da duoc tu dong dieu chinh de tranh loi khi deploy."
+                    )
             except Exception as e:
                 progress_bar.progress(0)
                 status_text.empty()
