@@ -11,15 +11,15 @@ import time
 MODEL_OPTIONS = {
     "t5-small": {
         "label": "t5-small",
-        "description": "Nhe nhat va phu hop nhat de deploy tren Streamlit Cloud"
+        "description": "Nhẹ nhất và phù hợp nhất để triển khai trên Streamlit Cloud"
     },
     "facebook/bart-base": {
         "label": "facebook/bart-base",
-        "description": "Chat luong tot hon nhung cham hon va ton RAM hon"
+        "description": "Chất lượng tốt hơn nhưng chậm hơn và tốn RAM hơn"
     },
     "facebook/bart-large-cnn": {
         "label": "facebook/bart-large-cnn",
-        "description": "Rat nang, de vuot gioi han tai nguyen tren cloud"
+        "description": "Rất nặng, dễ vượt giới hạn tài nguyên trên cloud"
     }
 }
 
