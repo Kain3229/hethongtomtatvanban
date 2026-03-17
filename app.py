@@ -85,6 +85,8 @@ if 'model_loaded' not in st.session_state:
     st.session_state.model_loaded = False
 if 'input_text' not in st.session_state:
     st.session_state.input_text = ""
+if 'text_input' not in st.session_state:
+    st.session_state.text_input = ""
 
 # Sidebar navigation
 pages = ["🏠 Trang Chủ", "🔧 Công Cụ", "📖 Hướng Dẫn Sử Dụng", "ℹ️ Về Ứng Dụng"]
@@ -196,12 +198,14 @@ elif page == "🔧 Công Cụ":
             value=150,
             step=10
         )
+
+        max_allowed_min_length = min(200, max_summary_length)
         
         min_summary_length = st.slider(
             "Độ Dài Tối Thiểu Của Tóm Tắt",
             min_value=10,
-            max_value=200,
-            value=50,
+            max_value=max_allowed_min_length,
+            value=min(50, max_allowed_min_length),
             step=10
         )
         
@@ -271,7 +275,6 @@ elif page == "🔧 Công Cụ":
             height=400,
             placeholder="Nhập hoặc dán văn bản mà bạn muốn tóm tắt...",
             label_visibility="collapsed",
-            value=st.session_state.input_text,
             key="text_input"
         )
         st.session_state.input_text = input_text
@@ -295,6 +298,8 @@ elif page == "🔧 Công Cụ":
                 if st.button("✨ Tóm Tắt Văn Bản", use_container_width=True, key="summarize"):
                     if not input_text.strip():
                         st.error("❌ Vui lòng nhập một số văn bản để tóm tắt")
+                    elif min_summary_length > max_summary_length:
+                        st.error("❌ Độ dài tối thiểu không được lớn hơn độ dài tối đa")
                     else:
                         with st.spinner("Đang tóm tắt..."):
                             try:
@@ -313,7 +318,9 @@ elif page == "🔧 Công Cụ":
             with col_btn2:
                 if st.button("🗑️ Xóa Văn Bản", use_container_width=True, key="clear"):
                     st.session_state.input_text = ""
+                    st.session_state.text_input = ""
                     st.session_state.result = None
+                    st.rerun()
         
         elif not st.session_state.summarizer:
             st.warning("⚠️ Vui lòng tải mô hình trước")

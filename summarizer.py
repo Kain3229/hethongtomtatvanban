@@ -6,7 +6,7 @@ Xử lý tóm tắt văn bản với hỗ trợ chia nhỏ
 import torch
 import nltk
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import logging
 
 # Setup logging
@@ -38,17 +38,26 @@ class TextSummarizer:
         
         logger.info(f"Đang tải mô hình: {model_name}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.max_tokens = min(max_tokens, self._get_model_token_limit())
+        self.max_tokens = min(max_tokens, self._get_model_token_limit(max_tokens))
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
         self.model.to(self.device)
         self.model.eval()
         logger.info(f"Mô hình đã tải trên thiết bị: {self.device}")
 
-    def _get_model_token_limit(self) -> int:
-        model_limit = getattr(self.tokenizer, 'model_max_length', self.max_tokens)
+    def _get_model_token_limit(self, fallback_tokens: int) -> int:
+        model_limit = getattr(self.tokenizer, 'model_max_length', fallback_tokens)
         if not isinstance(model_limit, int) or model_limit <= 0 or model_limit > 100000:
-            return self.max_tokens
+            return fallback_tokens
         return model_limit
+
+    def _normalize_summary_lengths(self, max_length: int, min_length: int) -> tuple[int, int]:
+        if max_length <= 0:
+            raise ValueError("max_length phải lớn hơn 0")
+        if min_length < 0:
+            raise ValueError("min_length không được âm")
+        if min_length > max_length:
+            raise ValueError("min_length không được lớn hơn max_length")
+        return max_length, min_length
     
     def count_tokens(self, text: str) -> int:
         """
@@ -135,6 +144,8 @@ class TextSummarizer:
         Returns:
             Văn bản được tóm tắt
         """
+        max_length, min_length = self._normalize_summary_lengths(max_length, min_length)
+
         inputs = self.tokenizer.encode(
             text,
             return_tensors="pt",
@@ -171,6 +182,8 @@ class TextSummarizer:
             - 'chunk_summaries': Danh sách tóm tắt cho mỗi chunk
             - 'final_summary': Bản tóm tắt kết hợp của tất cả chunk
         """
+        max_length, min_length = self._normalize_summary_lengths(max_length, min_length)
+
         # Đếm token trong văn bản gốc
         token_count = self.count_tokens(text)
         logger.info(f"Số token của văn bản gốc: {token_count}")
