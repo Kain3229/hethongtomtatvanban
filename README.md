@@ -1,5 +1,5 @@
 # Hệ Thống Tóm Tắt Văn Bản (Text Summarization System)
-
+- hệ thống được triển khai tại https://hethongtomtat.streamlit.app/
 🎯 **Ứng dụng AI tóm tắt văn bản tiếng Anh** sử dụng các mô hình Transformer hiện đại với hỗ trợ chia nhỏ tự động cho văn bản dài.
 
 ## ✨ Tính Năng Chính
