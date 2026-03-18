@@ -5,7 +5,7 @@
 
 ## ✨ Tính Năng Chính
 
-- **Chia Nhỏ Thông Minh**: Tự động chia văn bản vượt 1024 tokens thành các chunk nhỏ
+- **Chia Nhỏ Thông Minh**: Tự động chia văn bản vượt 1024 tokens thành các chunk tối đa 1024 token
 - **3 Mô Hình Lựa Chọn**: T5-small, BART-base, BART-large-CNN
 - **Đếm Token Thời Gian Thực**: Biết chính xác số token trong văn bản
 - **Giao Diện Web**: Ứng dụng Streamlit thân thiện, toàn tiếng Việt
@@ -131,8 +131,8 @@ print("Cần chia chunk?", result['needs_chunking'])
 
 - **Chọn Mô Hình**: Tùy theo độ dài văn bản (được gợi ý tự động)
 - **Max Token Chunks**: 512-2048 (mặc định 1024)
-- **Max Summary Length**: 50-500 (mặc định 150)
-- **Min Summary Length**: 10-200 (mặc định 50)
+- **Max Summary Length**: 60-220 (mặc định 140)
+- **Min Summary Length**: 20-120 (mặc định 50, luôn nhỏ hơn max ít nhất 20 token)
 
 ### 🚀 Cách Tăng Tốc Độ
 
@@ -162,7 +162,7 @@ print("Cần chia chunk?", result['needs_chunking'])
 # Sử dụng: t5-small
 ```
 
-Hoặc giảm Max Token per Chunk từ 1024 xuống 512
+Hoặc rút ngắn văn bản đầu vào hoặc dùng mô hình nhẹ hơn để giảm áp lực bộ nhớ
 
 #### ❌ Lỗi: Model download thất bại
 **Giải Pháp:**
