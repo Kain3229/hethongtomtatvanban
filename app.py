@@ -179,7 +179,7 @@ elif page == "🔧 Công Cụ":
 
         st.caption(MODEL_OPTIONS[model_option]["description"])
         if model_option != "t5-small":
-            st.warning("Streamlit Cloud chay on nhat voi t5-small. Hai mo hinh BART co the tai cham hoac het RAM.")
+            st.warning("Streamlit Cloud chạy ổn nhất với t5-small. Hai mô hình BART có thể tải chậm hoặc hết RAM.")
         
         st.markdown("---")
         
@@ -253,8 +253,8 @@ elif page == "🔧 Công Cụ":
                 st.success(f"✅ {model_option} đã tải thành công!")
                 if st.session_state.summarizer.max_tokens != max_tokens:
                     st.info(
-                        f"Model nay chi ho tro toi da {st.session_state.summarizer.max_tokens} token moi chunk. "
-                        "Gia tri da duoc tu dong dieu chinh de tranh loi khi deploy."
+                        f"Mô hình này chỉ hỗ trợ tối đa {st.session_state.summarizer.max_tokens} token mỗi chunk. "
+                        "Giá trị đã được tự động điều chỉnh để tránh lỗi khi deploy."
                     )
             except Exception as e:
                 progress_bar.progress(0)

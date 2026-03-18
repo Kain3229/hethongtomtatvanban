@@ -9,7 +9,7 @@
 - **Đếm Token Thời Gian Thực**: Biết chính xác số token trong văn bản
 - **Giao Diện Web**: Ứng dụng Streamlit thân thiện, toàn tiếng Việt
 - **Cấu Hình Linh Hoạt**: Điều chỉnh độ dài tóm tắt và các tham số khác
-- **Xử Lý Thông Minh**: Tóm tắt từng chunk rồi ghép lại intelligently
+- **Xử Lý Thông Minh**: Tóm tắt từng chunk rồi ghép lại một cách thông minh
 
 ## 🚀 Quick Start (Bắt Đầu Nhanh)
 
@@ -192,7 +192,7 @@ text_summarization_system/
 ├── summarizer.py       # 🧠 Logic tóm tắt chính
 ├── requirements.txt    # 📦 Các thư viện cần thiết
 ├── README.md          # 📖 Hướng dẫn này
-└── __pycache__/       # (Tại động, không chỉnh sửa)
+└── __pycache__/       # (Tạo động, không chỉnh sửa)
 ```
 
 ## 📦 Thư Viện Sử Dụng
