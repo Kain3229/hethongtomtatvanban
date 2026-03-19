@@ -6,6 +6,7 @@ Xử lý tóm tắt văn bản với hỗ trợ chia nhỏ
 import logging
 import re
 from collections import Counter
+from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 import nltk
@@ -27,6 +28,32 @@ SUMMARY_STOPWORDS = {
 MIN_SUMMARY_LENGTH = 20
 MAX_SUMMARY_MIN_LENGTH = 120
 MAX_SUMMARY_LENGTH = 220
+
+STYLE_CUE_TERMS = {
+    "narrative": {
+        "after", "before", "began", "decided", "ended", "felt", "later",
+        "life", "relationship", "shared", "story", "together", "transformed"
+    },
+    "structured": {
+        "answer", "benefit", "example", "important", "include", "key", "main",
+        "note", "question", "step", "summary", "tip"
+    },
+    "conversational": {
+        "answer", "asked", "because", "can", "explained", "how", "question",
+        "said", "should", "told", "why"
+    },
+    "expository": {
+        "because", "benefit", "however", "important", "include", "key", "main",
+        "overall", "result", "therefore"
+    },
+}
+
+
+@dataclass(frozen=True)
+class DocumentProfile:
+    style: str
+    salient_terms: set[str]
+    cue_terms: set[str]
 
 
 class TextSummarizer:
@@ -82,7 +109,12 @@ class TextSummarizer:
         return normalized_max_length, normalized_min_length
 
     def _normalize_text(self, text: str) -> str:
-        return re.sub(r"\s+", " ", text).strip()
+        normalized_lines = [
+            re.sub(r"[ \t]+", " ", line).strip()
+            for line in text.splitlines()
+        ]
+        collapsed_lines = [line for line in normalized_lines if line]
+        return "\n".join(collapsed_lines).strip()
 
     def _prepare_model_input(self, text: str) -> str:
         normalized_text = self._normalize_text(text)
@@ -95,6 +127,60 @@ class TextSummarizer:
 
     def _content_words(self, text: str) -> List[str]:
         return [word for word in self._word_tokens(text) if word not in SUMMARY_STOPWORDS and len(word) > 2]
+
+    def _extract_salient_terms(self, text: str, limit: int = 12) -> set[str]:
+        frequencies = Counter(self._content_words(text))
+        if not frequencies:
+            return set()
+        return {word for word, _ in frequencies.most_common(limit)}
+
+    def _detect_document_style(self, text: str) -> str:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        lowercase_text = text.lower()
+        faq_heading_present = any(re.match(r"^(?:faq|frequently asked questions)\s*:?$", line, re.IGNORECASE) for line in lines)
+        qa_line_count = sum(1 for line in lines if re.match(r"^[QA]\s*:", line, re.IGNORECASE))
+
+        bullet_line_count = sum(
+            1
+            for line in lines
+            if re.match(r"^(?:[-*•]|\d+[\).:-]|[A-Za-z]\))\s+", line)
+        )
+        question_line_count = sum(
+            1
+            for line in lines
+            if line.endswith("?") or re.match(r"^(?:q|question|faq)\s*[:.-]", line, re.IGNORECASE)
+        )
+        instruction_markers = len(re.findall(
+            r"\b(?:step|first|second|third|next|then|finally|install|use|create|open|click|run|follow|make|ensure)\b",
+            lowercase_text,
+        ))
+        dialogue_markers = len(re.findall(r"\b(?:asked|replied|said|told|why|how)\b", lowercase_text))
+        narrative_markers = len(re.findall(
+            r"\b(?:after|before|later|suddenly|remembered|felt|realized|decided|began|started|ended)\b",
+            lowercase_text,
+        ))
+        repeated_names = [
+            name for name, count in self._extract_repeated_names(text).items()
+            if count >= 3
+        ]
+
+        if faq_heading_present or qa_line_count >= 3:
+            return "structured"
+        if bullet_line_count >= 2 or instruction_markers >= 4:
+            return "structured"
+        if question_line_count >= 2 or dialogue_markers >= 4:
+            return "conversational"
+        if len(repeated_names) >= 2 and narrative_markers >= 3:
+            return "narrative"
+        return "expository"
+
+    def _build_document_profile(self, text: str) -> DocumentProfile:
+        style = self._detect_document_style(text)
+        return DocumentProfile(
+            style=style,
+            salient_terms=self._extract_salient_terms(text),
+            cue_terms=set(STYLE_CUE_TERMS.get(style, set())),
+        )
 
     def _sentence_support_score(self, summary_sentence: str, source_sentences: List[str]) -> float:
         summary_terms = set(self._content_words(summary_sentence))
@@ -154,7 +240,39 @@ class TextSummarizer:
             return " ".join(supported_sentences)
         return summary
 
-    def _score_source_sentences(self, sentences: List[str]) -> List[Tuple[float, int, str]]:
+    def _sentence_structure_bonus(self, sentence: str, style: str) -> float:
+        stripped_sentence = sentence.strip()
+        lowercase_sentence = stripped_sentence.lower()
+        bonus = 0.0
+
+        if stripped_sentence.endswith("?"):
+            bonus += 0.06 if style in {"structured", "conversational"} else 0.02
+        if ":" in stripped_sentence and len(stripped_sentence.split()) <= 16:
+            bonus += 0.05
+        if any(char.isdigit() for char in stripped_sentence):
+            bonus += 0.03
+        if re.match(r"^(?:first|second|third|next|finally|step|tip|note|q|a)\b", lowercase_sentence):
+            bonus += 0.08
+
+        return min(bonus, 0.16)
+
+    def _sentence_profile_bonus(self, sentence: str, profile: DocumentProfile | None) -> float:
+        if profile is None:
+            return 0.0
+
+        sentence_terms = set(self._content_words(sentence))
+        if not sentence_terms:
+            return 0.0
+
+        salient_overlap = len(sentence_terms & profile.salient_terms)
+        cue_overlap = len(sentence_terms & profile.cue_terms)
+        return (
+            min(salient_overlap, 4) * 0.04
+            + min(cue_overlap, 3) * 0.05
+            + self._sentence_structure_bonus(sentence, profile.style)
+        )
+
+    def _score_source_sentences(self, sentences: List[str], profile: DocumentProfile | None = None) -> List[Tuple[float, int, str]]:
         content_words = self._content_words(" ".join(sentences))
         frequencies = Counter(content_words)
         if not frequencies:
@@ -181,16 +299,17 @@ class TextSummarizer:
                 position_bonus += 0.08
 
             unique_term_bonus = len(set(sentence_words)) / max(len(sentence_words), 1) * 0.1
-            scored_sentences.append((sentence_score + position_bonus + unique_term_bonus, index, sentence))
+            profile_bonus = self._sentence_profile_bonus(sentence, profile)
+            scored_sentences.append((sentence_score + position_bonus + unique_term_bonus + profile_bonus, index, sentence))
 
         return scored_sentences
 
-    def _build_extractive_context(self, text: str, target_tokens: int) -> str:
+    def _build_extractive_context(self, text: str, target_tokens: int, profile: DocumentProfile | None = None) -> str:
         sentences = self.split_into_sentences(text)
         if len(sentences) <= 3:
             return self._normalize_text(text)
 
-        scored_items = self._score_source_sentences(sentences)
+        scored_items = self._score_source_sentences(sentences, profile)
         scored_sentences = sorted(scored_items, reverse=True)
         if not scored_sentences:
             return self._normalize_text(text)
@@ -243,9 +362,9 @@ class TextSummarizer:
         selected_sentences.sort(key=lambda item: item[0])
         return " ".join(sentence for _, sentence in selected_sentences)
 
-    def _extractive_fallback(self, text: str, max_length: int) -> str:
+    def _extractive_fallback(self, text: str, max_length: int, profile: DocumentProfile | None = None) -> str:
         approx_token_budget = max(max_length * 2, 80)
-        return self._build_extractive_context(text, approx_token_budget)
+        return self._build_extractive_context(text, approx_token_budget, profile)
 
     def _should_use_extractive_fallback(self, summary: str, source_text: str) -> bool:
         summary_sentences = self.split_into_sentences(summary)
@@ -266,6 +385,28 @@ class TextSummarizer:
         ) / len(summary_sentences)
 
         return source_span_ratio < 0.35 and avg_support < 0.72
+
+    def _should_force_structured_fallback(
+        self,
+        summary: str,
+        source_text: str,
+        profile: DocumentProfile | None,
+    ) -> bool:
+        if profile is None or profile.style != "structured":
+            return False
+
+        summary_sentences = self.split_into_sentences(summary)
+        source_sentences = self.split_into_sentences(source_text)
+        if len(summary_sentences) < 2 or len(source_sentences) < 4:
+            return False
+
+        matched_indexes = {
+            self._best_matching_source_index(sentence, source_sentences)
+            for sentence in summary_sentences
+        }
+        source_coverage_ratio = len(matched_indexes) / max(len(source_sentences), 1)
+
+        return source_coverage_ratio <= 0.5
 
     def _cleanup_summary_text(self, summary: str) -> str:
         cleaned_summary = self._normalize_text(summary)
@@ -306,15 +447,6 @@ class TextSummarizer:
         }
         return min(len(entities), 4) * 0.04
 
-    def _sentence_theme_bonus(self, sentence: str) -> float:
-        keywords = {
-            "alone", "lonely", "adopted", "companion", "friendship", "friends",
-            "routine", "transformed", "home", "shared", "together", "changed",
-            "relationship", "peaceful", "life"
-        }
-        sentence_terms = set(self._content_words(sentence))
-        return min(len(sentence_terms & keywords), 3) * 0.07
-
     def _extract_repeated_names(self, text: str) -> Counter:
         ignored_tokens = {
             "The", "A", "An", "In", "On", "At", "But", "And", "After", "Before",
@@ -327,15 +459,7 @@ class TextSummarizer:
         return Counter(names)
 
     def _looks_like_narrative_text(self, text: str) -> bool:
-        sentences = self.split_into_sentences(text)
-        if len(sentences) < 12:
-            return False
-
-        repeated_names = [
-            name for name, count in self._extract_repeated_names(text).items()
-            if count >= 3
-        ]
-        return len(repeated_names) >= 2
+        return self._detect_document_style(text) == "narrative"
 
     def _pick_bucket_sentence(
         self,
@@ -343,7 +467,8 @@ class TextSummarizer:
         keywords: set[str],
         start_ratio: float,
         end_ratio: float,
-        selected_sentences: List[str]
+        selected_sentences: List[str],
+        profile: DocumentProfile | None = None,
     ) -> str:
         if not sentences:
             return ""
@@ -368,7 +493,7 @@ class TextSummarizer:
             score = (
                 keyword_score * 1.2
                 + self._sentence_entity_bonus(sentence)
-                + self._sentence_theme_bonus(sentence)
+                + self._sentence_profile_bonus(sentence, profile)
                 + (0.2 if sentence.strip().endswith(('.', '!', '?')) else 0.0)
             )
             if score > best_score:
@@ -381,6 +506,8 @@ class TextSummarizer:
         sentences = self.split_into_sentences(text)
         if len(sentences) < 8:
             return ""
+
+        profile = self._build_document_profile(text)
 
         buckets = [
             ({"alone", "lonely", "quiet", "routine", "lived"}, 0.0, 0.2),
@@ -397,7 +524,8 @@ class TextSummarizer:
                 keywords,
                 start_ratio,
                 end_ratio,
-                selected_sentences
+                selected_sentences,
+                profile,
             )
             if selected_sentence:
                 selected_sentences.append(selected_sentence)
@@ -413,7 +541,13 @@ class TextSummarizer:
 
         return narrative_summary
 
-    def _build_guided_final_summary(self, chunks: List[str], guidance_texts: List[str], max_length: int) -> str:
+    def _build_guided_final_summary(
+        self,
+        chunks: List[str],
+        guidance_texts: List[str],
+        max_length: int,
+        profile: DocumentProfile | None = None,
+    ) -> str:
         if not chunks:
             return ""
 
@@ -448,7 +582,7 @@ class TextSummarizer:
                     (local_scores.get(sentence_index, 0.0) * 0.45)
                     + (guidance_score * 1.1)
                     + self._sentence_entity_bonus(sentence)
-                    + self._sentence_theme_bonus(sentence)
+                    + self._sentence_profile_bonus(sentence, profile)
                     + intro_bonus
                     + outro_bonus
                 )
@@ -469,7 +603,7 @@ class TextSummarizer:
                 sentences_to_pick -= 1
 
         if not selected_items:
-            return self._extractive_fallback(" ".join(chunks), max_length)
+            return self._extractive_fallback(" ".join(chunks), max_length, profile)
 
         ordered_sentences = [sentence for _, _, sentence, _ in sorted(selected_items, key=lambda item: (item[0], item[1]))]
         return self._cleanup_summary_text(" ".join(ordered_sentences))
@@ -486,16 +620,26 @@ class TextSummarizer:
         chunk_min_length = max(10, chunk_min_length)
         return chunk_max_length, chunk_min_length
 
-    def _summarize_chunk(self, chunk: str, max_length: int, min_length: int) -> str:
+    def _summarize_chunk(
+        self,
+        chunk: str,
+        max_length: int,
+        min_length: int,
+        profile: DocumentProfile | None = None,
+    ) -> str:
         chunk_text = chunk
         chunk_token_count = self.count_tokens(chunk)
         if chunk_token_count > self._get_precompression_threshold():
-            chunk_text = self._build_extractive_context(chunk, min(self.chunk_token_limit - 8, max(max_length * 6, 196)))
+            chunk_text = self._build_extractive_context(
+                chunk,
+                min(self.chunk_token_limit - 8, max(max_length * 6, 196)),
+                profile,
+            )
 
         summary = self.summarize_single(chunk_text, max_length, min_length)
         summary = self._cleanup_summary_text(self._filter_unsupported_sentences(summary, chunk))
         if not summary.strip():
-            return self._extractive_fallback(chunk, max_length)
+            return self._extractive_fallback(chunk, max_length, profile)
         return summary
     
     def count_tokens(self, text: str) -> int:
@@ -525,12 +669,33 @@ class TextSummarizer:
         if not normalized_text:
             return []
 
-        try:
-            sentences = nltk.sent_tokenize(normalized_text)
-        except Exception:
-            sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z\"'])", normalized_text)
+        sentence_groups = []
+        for block in re.split(r"\n+", normalized_text):
+            stripped_block = block.strip()
+            if not stripped_block:
+                continue
 
-        cleaned_sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+            bullet_match = re.match(r"^(?:[-*•]|\d+[\).:-]|[A-Za-z]\))\s+", stripped_block)
+            short_heading = re.match(r"^[A-Z][A-Za-z0-9 /&'()-]{1,80}:$", stripped_block)
+
+            if bullet_match:
+                item_text = re.sub(r"^(?:[-*•]|\d+[\).:-]|[A-Za-z]\))\s+", "", stripped_block).strip()
+                if item_text and item_text[-1] not in ".!?":
+                    item_text = f"{item_text}."
+                sentence_groups.append([item_text] if item_text else [])
+                continue
+
+            if short_heading:
+                sentence_groups.append([f"{stripped_block[:-1].strip()}." ])
+                continue
+
+            try:
+                sentences = nltk.sent_tokenize(stripped_block)
+            except Exception:
+                sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z\"'])", stripped_block)
+            sentence_groups.append(sentences)
+
+        cleaned_sentences = [sentence.strip() for group in sentence_groups for sentence in group if sentence.strip()]
         if cleaned_sentences:
             return cleaned_sentences
 
@@ -646,23 +811,31 @@ class TextSummarizer:
             raise ValueError("Văn bản đầu vào không được để trống")
 
         max_length, min_length = self._normalize_summary_lengths(max_length, min_length)
+        profile = self._build_document_profile(normalized_text)
 
         # Đếm token trong văn bản gốc
         token_count = self.count_tokens(normalized_text)
         logger.info(f"Số token của văn bản gốc: {token_count}")
+        logger.info("Đã nhận diện phong cách văn bản: %s", profile.style)
 
         # Nếu văn bản ngắn và nằm trong giới hạn kích thước, tóm tắt trực tiếp
         if token_count <= self.chunk_token_limit:
             logger.info("Văn bản nằm trong giới hạn token, tóm tắt trực tiếp")
             direct_text = normalized_text
             if token_count > self._get_precompression_threshold():
-                direct_text = self._build_extractive_context(normalized_text, min(self.chunk_token_limit - 8, max(max_length * 6, 196)))
+                direct_text = self._build_extractive_context(
+                    normalized_text,
+                    min(self.chunk_token_limit - 8, max(max_length * 6, 196)),
+                    profile,
+                )
                 logger.info("Đã tạo ngữ cảnh extractive cục bộ với %s token", self.count_tokens(direct_text))
 
             summary = self.summarize_single(direct_text, max_length, min_length)
             summary = self._cleanup_summary_text(self._filter_unsupported_sentences(summary, normalized_text))
+            if self._should_force_structured_fallback(summary, normalized_text, profile):
+                summary = self._extractive_fallback(normalized_text, max_length, profile)
             if not summary.strip() or self._should_use_extractive_fallback(summary, normalized_text):
-                summary = self._extractive_fallback(normalized_text, max_length)
+                summary = self._extractive_fallback(normalized_text, max_length, profile)
             return {
                 'original_text': normalized_text,
                 'token_count': token_count,
@@ -683,7 +856,7 @@ class TextSummarizer:
         chunk_summaries = []
         for i, chunk in enumerate(chunks):
             logger.info(f"Đang tóm tắt chunk {i+1}/{len(chunks)}")
-            summary = self._summarize_chunk(chunk, chunk_max_length, chunk_min_length)
+            summary = self._summarize_chunk(chunk, chunk_max_length, chunk_min_length, profile)
             chunk_summaries.append(summary)
         
         # Ghép tất cả các bản tóm tắt
@@ -698,23 +871,27 @@ class TextSummarizer:
                 final_input = combined_summary
                 if self.count_tokens(final_input) > self.chunk_token_limit:
                     logger.info("Bản tóm tắt kết hợp vượt quá giới hạn token, đang nén ngữ cảnh trước khi tóm tắt lần cuối")
-                    final_input = self._build_extractive_context(combined_summary, min(self.chunk_token_limit - 8, max(max_length * 5, 160)))
+                    final_input = self._build_extractive_context(
+                        combined_summary,
+                        min(self.chunk_token_limit - 8, max(max_length * 5, 160)),
+                        profile,
+                    )
 
                 final_summary = self.summarize_single(final_input, max_length, min_length)
 
-            guided_final_summary = self._build_guided_final_summary(chunks, chunk_summaries, max_length)
+            guided_final_summary = self._build_guided_final_summary(chunks, chunk_summaries, max_length, profile)
             if guided_final_summary.strip():
                 final_summary = guided_final_summary
         else:
             final_summary = combined_summary
 
         final_summary = self._cleanup_summary_text(self._filter_unsupported_sentences(final_summary, normalized_text))
-        if self._looks_like_narrative_text(normalized_text):
+        if profile.style == "narrative" and self._looks_like_narrative_text(normalized_text):
             narrative_summary = self._build_narrative_summary(normalized_text, max_length)
             if narrative_summary.strip():
                 final_summary = narrative_summary
         if not final_summary.strip() or self._should_use_extractive_fallback(final_summary, normalized_text):
-            final_summary = self._extractive_fallback(normalized_text, max_length)
+            final_summary = self._extractive_fallback(normalized_text, max_length, profile)
         
         return {
             'original_text': normalized_text,

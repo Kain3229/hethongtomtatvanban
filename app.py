@@ -15,7 +15,7 @@ MODEL_OPTIONS = {
     },
     "facebook/bart-large-cnn": {
         "label": "facebook/bart-large-cnn",
-        "description": "Đã fine-tune trên CNN/DailyMail nên thường cho kết quả tốt nhất với bài viết tiếng Anh kiểu tin tức"
+        "description": "Đã fine-tune trên CNN/DailyMail nhưng vẫn hữu ích cho văn bản dài, bài giải thích, FAQ và nội dung có cấu trúc rõ"
     }
 }
 
@@ -189,8 +189,8 @@ if page == "🏠 Trang Chủ":
 elif page == "🔧 Công Cụ":
     st.title("🔧 Công Cụ Tóm Tắt")
     st.caption(
-        "Ứng dụng hỗ trợ tốt nhất cho văn bản tiếng Anh, đặc biệt là nội dung mang phong cách báo chí hoặc giải thích. "
-        "t5-small là mô hình T5 tiền huấn luyện trên C4, còn facebook/bart-large-cnn được fine-tune trên CNN/DailyMail nên thường chính xác hơn với bài viết tiếng Anh dạng tin tức."
+        "Ứng dụng hỗ trợ tốt cho nhiều dạng văn bản tiếng Anh như bài giải thích, tin tức, hướng dẫn, FAQ, ghi chú có cấu trúc và hội thoại ngắn. "
+        "t5-small là mô hình T5 tiền huấn luyện trên C4, còn facebook/bart-large-cnn được fine-tune trên CNN/DailyMail nhưng vẫn thường hữu ích hơn khi văn bản dài hoặc cần mức chi tiết cao hơn."
     )
     
     # Settings in columns for better layout
@@ -321,7 +321,7 @@ elif page == "🔧 Công Cụ":
             if token_count <= 1200:
                 st.success("✅ t5-small: Nhanh nhất và phù hợp cho văn bản tiếng Anh ngắn đến vừa")
             else:
-                st.info("ℹ️ facebook/bart-large-cnn: Phù hợp hơn khi cần chất lượng cao với văn bản dài hoặc phong cách báo chí")
+                st.info("ℹ️ facebook/bart-large-cnn: Phù hợp hơn khi cần chất lượng cao với văn bản dài, FAQ, nội dung có cấu trúc hoặc bài viết nhiều chi tiết")
             
             col_btn1, col_btn2 = st.columns(2)
             
@@ -441,7 +441,7 @@ elif page == "📖 Hướng Dẫn Sử Dụng":
         st.markdown("""
         ## 📊 Chọn Mô Hình
 
-        Lưu ý: hệ thống cho kết quả ổn định nhất với **văn bản tiếng Anh** có cách viết rõ ràng, mạch lạc, đặc biệt là nội dung theo **phong cách báo chí** hoặc giải thích.
+        Lưu ý: hệ thống cho kết quả ổn định nhất với **văn bản tiếng Anh** có cách viết rõ ràng, mạch lạc, bao gồm bài giải thích, tin tức, hướng dẫn, FAQ, ghi chú có cấu trúc và hội thoại ngắn.
         
         | Kích Thước | Khuyến Nghị |
         |-----------|------------|
@@ -456,7 +456,7 @@ elif page == "📖 Hướng Dẫn Sử Dụng":
         
         **facebook/bart-large-cnn** (5GB)
         - Chất lượng cao hơn
-        - Tốt nhất cho bài viết tiếng Anh kiểu tin tức, báo chí hoặc nội dung dài
+        - Hữu ích hơn cho nội dung dài, nhiều chi tiết, FAQ hoặc văn bản có cấu trúc rõ
         """)
     
 
@@ -486,7 +486,7 @@ elif page == "ℹ️ Về Ứng Dụng":
     
     ### 🧠 2 Mô Hình AI Lựa Chọn
     - **T5-small** (800MB): Nhẹ và nhanh, phù hợp văn bản tiếng Anh ngắn đến vừa
-    - **BART-large-CNN** (5GB): Chất lượng cao hơn, phù hợp bài viết dài và nội dung mang phong cách báo chí
+    - **BART-large-CNN** (5GB): Chất lượng cao hơn, phù hợp bài viết dài, FAQ, hướng dẫn và nội dung có cấu trúc rõ
     - Tự động đề xuất mô hình phù hợp dựa trên độ dài văn bản
     
     ### 📊 Thông Tin Chi Tiết
@@ -513,7 +513,7 @@ elif page == "ℹ️ Về Ứng Dụng":
     | **Mô Hình** | T5-small, BART-large-CNN |
     | **Xử Lý Ngôn Ngữ** | NLTK |
     
-    **Chi Tiết Kỹ Thuật:** Ứng dụng sử dụng các mô hình từ Hugging Face. `t5-small` là mô hình T5 tiền huấn luyện tổng quát trên dữ liệu tiếng Anh quy mô lớn, còn `facebook/bart-large-cnn` được fine-tune cho bài toán tóm tắt trên bộ dữ liệu CNN/DailyMail nên phù hợp hơn với bài viết tiếng Anh kiểu tin tức.
+    **Chi Tiết Kỹ Thuật:** Ứng dụng sử dụng các mô hình từ Hugging Face. `t5-small` là mô hình T5 tiền huấn luyện tổng quát trên dữ liệu tiếng Anh quy mô lớn, còn `facebook/bart-large-cnn` được fine-tune cho bài toán tóm tắt trên bộ dữ liệu CNN/DailyMail. Hệ thống bổ sung thêm bước nhận diện phong cách nội dung và hậu xử lý để thích ứng tốt hơn với văn bản giải thích, danh sách, FAQ và một số dạng hội thoại ngắn.
     
     ---
     
