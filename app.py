@@ -11,15 +11,11 @@ import time
 MODEL_OPTIONS = {
     "t5-small": {
         "label": "t5-small",
-        "description": "Nhẹ nhất và phù hợp nhất để triển khai trên Streamlit Cloud"
-    },
-    "facebook/bart-base": {
-        "label": "facebook/bart-base",
-        "description": "Chất lượng tốt hơn nhưng chậm hơn và tốn RAM hơn"
+        "description": "Nhẹ nhất, tiền huấn luyện trên C4 và phù hợp cho văn bản tiếng Anh ngắn đến vừa"
     },
     "facebook/bart-large-cnn": {
         "label": "facebook/bart-large-cnn",
-        "description": "Rất nặng, dễ vượt giới hạn tài nguyên trên cloud"
+        "description": "Đã fine-tune trên CNN/DailyMail nên thường cho kết quả tốt nhất với bài viết tiếng Anh kiểu tin tức"
     }
 }
 
@@ -27,6 +23,12 @@ MODEL_OPTIONS = {
 @st.cache_resource(show_spinner=False)
 def load_summarizer(model_name: str, max_tokens: int) -> TextSummarizer:
     return TextSummarizer(model_name=model_name, max_tokens=max_tokens)
+
+
+def clear_text_input() -> None:
+    st.session_state.input_text = ""
+    st.session_state.text_input = ""
+    st.session_state.result = None
 
 # Page configuration
 st.set_page_config(
@@ -66,6 +68,28 @@ st.markdown("""
         border-radius: 10px;
         margin: 1rem 0;
         border-left: 4px solid #667eea;
+    }
+    .model-status-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.35rem;
+        color: #4a4a4a;
+        font-size: 0.9rem;
+    }
+    .model-status-dot {
+        width: 0.65rem;
+        height: 0.65rem;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+    .model-status-dot.active {
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+    }
+    .model-status-dot.inactive {
+        background: #b8c2cc;
     }
     /* Remove disabled cursor from textarea */
     textarea:disabled {
@@ -164,6 +188,10 @@ if page == "🏠 Trang Chủ":
 # ============== SETTINGS PAGE ==============
 elif page == "🔧 Công Cụ":
     st.title("🔧 Công Cụ Tóm Tắt")
+    st.caption(
+        "Ứng dụng hỗ trợ tốt nhất cho văn bản tiếng Anh, đặc biệt là nội dung mang phong cách báo chí hoặc giải thích. "
+        "t5-small là mô hình T5 tiền huấn luyện trên C4, còn facebook/bart-large-cnn được fine-tune trên CNN/DailyMail nên thường chính xác hơn với bài viết tiếng Anh dạng tin tức."
+    )
     
     # Settings in columns for better layout
     col1, col2 = st.columns([1, 2])
@@ -178,8 +206,6 @@ elif page == "🔧 Công Cụ":
         )
 
         st.caption(MODEL_OPTIONS[model_option]["description"])
-        if model_option != "t5-small":
-            st.warning("Streamlit Cloud chạy ổn nhất với t5-small. Hai mô hình BART có thể tải chậm hoặc hết RAM.")
         
         st.markdown("---")
         
@@ -216,7 +242,6 @@ elif page == "🔧 Công Cụ":
         
         models_status = {
             "t5-small": False,
-            "facebook/bart-base": False,
             "facebook/bart-large-cnn": False
         }
         
@@ -230,8 +255,16 @@ elif page == "🔧 Công Cụ":
         
         # Display status
         for model, loaded in models_status.items():
-            icon = "✅" if loaded else "❌"
-            st.caption(f"{icon} {model}")
+            status_class = "active" if loaded else "inactive"
+            st.markdown(
+                f"""
+                <div class="model-status-item">
+                    <span class="model-status-dot {status_class}"></span>
+                    <span>{model}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
         
         st.markdown("---")
         
@@ -285,12 +318,10 @@ elif page == "🔧 Công Cụ":
             
             # Model recommendation based on token count
             st.markdown("**💡 Khuyến Nghị Mô Hình:**")
-            if token_count <= 1000:
-                st.success("✅ t5-small: Nhanh nhất & đủ tốt")
-            elif token_count <= 3000:
-                st.info("ℹ️ facebook/bart-base: Cân bằng tốc độ & chất lượng")
+            if token_count <= 1200:
+                st.success("✅ t5-small: Nhanh nhất và phù hợp cho văn bản tiếng Anh ngắn đến vừa")
             else:
-                st.error("🔴 facebook/bart-large-cnn: Cần mô hình mạnh cho chất lượng tốt")
+                st.info("ℹ️ facebook/bart-large-cnn: Phù hợp hơn khi cần chất lượng cao với văn bản dài hoặc phong cách báo chí")
             
             col_btn1, col_btn2 = st.columns(2)
             
@@ -316,10 +347,12 @@ elif page == "🔧 Công Cụ":
                                 st.error(f"❌ Lỗi khi tóm tắt: {str(e)}")
             
             with col_btn2:
-                if st.button("🗑️ Xóa Văn Bản", use_container_width=True, key="clear"):
-                    st.session_state.input_text = ""
-                    st.session_state.text_input = ""
-                    st.session_state.result = None
+                if st.button(
+                    "🗑️ Xóa Văn Bản",
+                    use_container_width=True,
+                    key="clear",
+                    on_click=clear_text_input
+                ):
                     st.rerun()
         
         elif not st.session_state.summarizer:
@@ -407,26 +440,23 @@ elif page == "📖 Hướng Dẫn Sử Dụng":
     with col_guide2:
         st.markdown("""
         ## 📊 Chọn Mô Hình
+
+        Lưu ý: hệ thống cho kết quả ổn định nhất với **văn bản tiếng Anh** có cách viết rõ ràng, mạch lạc, đặc biệt là nội dung theo **phong cách báo chí** hoặc giải thích.
         
         | Kích Thước | Khuyến Nghị |
         |-----------|------------|
-        | **≤ 1K** | 🟢 t5-small |
-        | **1K-3K** | 🔵 facebook/bart-base |
-        | **> 3K** | 🔴 facebook/bart-large-cnn |
+        | **≤ 1.2K** | 🟢 t5-small |
+        | **> 1.2K** | 🔴 facebook/bart-large-cnn |
         
         ### Chi Tiết Mô Hình
         
         **t5-small** (800MB)
         - Nhanh nhất
-        - Mặc định tốt
-        
-        **facebook/bart-base** (2GB)
-        - Cân bằng chất lượng
-        - Tin tức & bài viết
+        - Phù hợp cho văn bản tiếng Anh ngắn đến vừa
         
         **facebook/bart-large-cnn** (5GB)
-        - Chất lượng cao nhất
-        - Tài liệu dài & phức tạp
+        - Chất lượng cao hơn
+        - Tốt nhất cho bài viết tiếng Anh kiểu tin tức, báo chí hoặc nội dung dài
         """)
     
 
@@ -442,8 +472,8 @@ elif page == "ℹ️ Về Ứng Dụng":
     thông tin chính yếu một cách nhanh chóng.
     
     Đây là một **phiên bản thử nghiệm (Beta)** nhằm kiểm chứng hiệu suất của các mô hình học sâu hiện đại trong lĩnh vực 
-    xử lý ngôn ngữ tự nhiên (NLP). Ứng dụng tích hợp ba mô hình tầng trung/cao từ Hugging Face Hub, cho phép người dùng 
-    so sánh chất lượng tóm tắt giữa các kiến trúc khác nhau như **T5** và **BART**.
+    xử lý ngôn ngữ tự nhiên (NLP). Ứng dụng tích hợp hai mô hình từ Hugging Face Hub, cho phép người dùng 
+    lựa chọn giữa tốc độ xử lý và chất lượng tóm tắt trong hai kiến trúc **T5** và **BART**.
     
     ---
     
@@ -454,10 +484,9 @@ elif page == "ℹ️ Về Ứng Dụng":
     - Hỗ trợ GPU để tăng tốc độ lên tới 5-10 lần
     - Tự động chia nhỏ văn bản dài thành các chunk có thể xử lý
     
-    ### 🧠 3 Mô Hình AI Lựa Chọn
-    - **T5-small** (800MB): Nhẹ và nhanh, phù hợp văn bản ngắn
-    - **BART-base** (2GB): Cân bằng giữa tốc độ và chất lượng
-    - **BART-large-CNN** (5GB): Chất lượng cao nhất, cho tài liệu phức tạp
+    ### 🧠 2 Mô Hình AI Lựa Chọn
+    - **T5-small** (800MB): Nhẹ và nhanh, phù hợp văn bản tiếng Anh ngắn đến vừa
+    - **BART-large-CNN** (5GB): Chất lượng cao hơn, phù hợp bài viết dài và nội dung mang phong cách báo chí
     - Tự động đề xuất mô hình phù hợp dựa trên độ dài văn bản
     
     ### 📊 Thông Tin Chi Tiết
@@ -481,12 +510,10 @@ elif page == "ℹ️ Về Ứng Dụng":
     | **AI Framework** | Transformers (Hugging Face) |
     | **Deep Learning** | PyTorch |
     | **Web Framework** | Streamlit |
-    | **Mô Hình** | T5, BART (pre-trained) |
+    | **Mô Hình** | T5-small, BART-large-CNN |
     | **Xử Lý Ngôn Ngữ** | NLTK |
     
-    **Chi Tiết Kỹ Thuật:** Ứng dụng sử dụng các mô hình **pre-trained** (đã được huấn luyện sẵn) từ Hugging Face, 
-    cho phép đạt được chất lượng tóm tắt cao mà không cần đào tạo lại. Các mô hình đã được huấn luyện 
-    trên hàng triệu tài liệu tiếng Anh và tối ưu hóa cho xử lý ngôn ngữ tự nhiên.
+    **Chi Tiết Kỹ Thuật:** Ứng dụng sử dụng các mô hình từ Hugging Face. `t5-small` là mô hình T5 tiền huấn luyện tổng quát trên dữ liệu tiếng Anh quy mô lớn, còn `facebook/bart-large-cnn` được fine-tune cho bài toán tóm tắt trên bộ dữ liệu CNN/DailyMail nên phù hợp hơn với bài viết tiếng Anh kiểu tin tức.
     
     ---
     
@@ -502,7 +529,6 @@ elif page == "ℹ️ Về Ứng Dụng":
     
     **Dung Lượng Mô Hình:**
     - T5-small: ~800MB
-    - BART-base: ~2GB
     - BART-large-CNN: ~5GB
     
     ---
