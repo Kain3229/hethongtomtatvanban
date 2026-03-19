@@ -132,7 +132,7 @@ if page == "🏠 Trang Chủ":
     st.markdown("""
     <div class="home-container">
         <div class="home-title">📝 Tóm Tắt Văn Bản</div>
-        <div class="home-subtitle">Công cụ AI mạnh mẽ để tóm tắt bất kỳ văn bản nào</div>
+        <div class="home-subtitle">Công cụ AI mạnh mẽ để tóm tắt các văn bản tiếng Anh</div>
     </div>
     """, unsafe_allow_html=True)
     
