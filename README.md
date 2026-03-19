@@ -79,7 +79,7 @@ text_summarization_system/
 
 ## Trạng thái dự án
 
-- Phiên bản: `v1.0`
+- Phiên bản: `v1.2`
 - Giao diện: tiếng Việt
 - Ngôn ngữ đầu vào tối ưu: tiếng Anh
 - Mục tiêu: demo hệ thống tóm tắt văn bản dùng mô hình học sâu

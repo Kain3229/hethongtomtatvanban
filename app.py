@@ -568,7 +568,7 @@ elif page == "ℹ️ Về Ứng Dụng":
     
     ## ℹ️ Thông Tin Thêm
     
-    **Phiên Bản:** v1.0 (Beta)  
+    **Phiên Bản:** v1.2 (Beta)  
     **Trạng Thái:** Còn đang phát triển  
     **Nguồn Mô Hình:** Hugging Face Hub  
     **Framework:** Streamlit  
@@ -581,6 +581,6 @@ elif page == "ℹ️ Về Ứng Dụng":
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #888; font-size: 12px;'>
-    Được tạo với ❤️ bằng Streamlit | Hệ Thống Tóm Tắt Văn Bản v1.0
+    Được tạo với ❤️ bằng Streamlit | Hệ Thống Tóm Tắt Văn Bản v1.2
 </div>
 """, unsafe_allow_html=True)
