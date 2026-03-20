@@ -5,7 +5,7 @@
 - Streamlit app: https://hethongtomtat.streamlit.app/
 
 ## Lưu ý quan trọng
-- Vui lòng reboot app tạo manager app tại góc dưới bên phải màn hình để sử dụng phiên bản mới nhất của ứng dụng
+- Vui lòng reboot app tại manager app ở góc dưới bên phải màn hình để sử dụng phiên bản mới nhất của ứng dụng
 - Hệ thống được thiết kế để tóm tắt văn bản tiếng Anh.
 - Kết quả ổn định nhất khi đầu vào là nội dung có cấu trúc tương đối rõ như bài giải thích, tin tức, hướng dẫn, FAQ, ghi chú theo ý, hoặc hội thoại ngắn.
 - Nếu văn bản quá cảm tính, quá rời rạc, trộn nhiều ngôn ngữ, hoặc thiếu ngữ cảnh, chất lượng tóm tắt có thể giảm.
