@@ -1,5 +1,12 @@
 # Hệ Thống Tóm Tắt Văn Bản
 
+Thông tin sinh viên
+
+Nguyễn Hữu Thắng
+DH23TIN09
+236690
+nguyenhuuthangys@gmail.com
+
 ## Link sử dụng nhanh
 
 - Streamlit app: https://hethongtomtat.streamlit.app/
