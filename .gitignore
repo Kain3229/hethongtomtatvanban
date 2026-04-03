@@ -46,7 +46,13 @@ MANIFEST
 
 # Model Cache (optional - comment out to keep cached models)
 # ~/.cache/huggingface/
-# models/
+models/**
+!models/README.md
+!models/t5-small/
+!models/t5-small/.gitkeep
+!models/facebook/
+!models/facebook/bart-large-cnn/
+!models/facebook/bart-large-cnn/.gitkeep
 
 # Output files
 *.json

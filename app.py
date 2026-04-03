@@ -4,7 +4,7 @@ Provides a user-friendly interface for text summarization with chunking support
 """
 
 import streamlit as st
-from summarizer import TextSummarizer
+from summarizer import TextSummarizer, find_local_model_dir, get_local_models_root
 import time
 
 
@@ -206,6 +206,7 @@ elif page == "🔧 Công Cụ":
         )
 
         st.caption(MODEL_OPTIONS[model_option]["description"])
+        st.caption(f"Thư mục model local được ưu tiên: {get_local_models_root()}")
         
         st.markdown("---")
         
@@ -239,6 +240,10 @@ elif page == "🔧 Công Cụ":
         
         # Model Loading Progress Display
         st.markdown("**📦 Trạng Thái Các Mô Hình:**")
+        local_model_dirs = {
+            model_name: find_local_model_dir(model_name)
+            for model_name in MODEL_OPTIONS
+        }
         
         models_status = {
             "t5-small": False,
@@ -256,15 +261,22 @@ elif page == "🔧 Công Cụ":
         # Display status
         for model, loaded in models_status.items():
             status_class = "active" if loaded else "inactive"
+            local_label = "local" if local_model_dirs.get(model) else "cache/download"
             st.markdown(
                 f"""
                 <div class="model-status-item">
                     <span class="model-status-dot {status_class}"></span>
-                    <span>{model}</span>
+                    <span>{model} ({local_label})</span>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
+
+        selected_local_dir = local_model_dirs.get(model_option)
+        if selected_local_dir:
+            st.info(f"Sẽ ưu tiên model local tại: {selected_local_dir}")
+        else:
+            st.caption("Chưa phát hiện model local cho lựa chọn này. Hệ thống sẽ dùng cache hoặc tải từ Hugging Face khi cần.")
         
         st.markdown("---")
         
@@ -283,7 +295,9 @@ elif page == "🔧 Công Cụ":
                 progress_bar.progress(100)
                 status_text.empty()
                 progress_bar.empty()
-                st.success(f"✅ {model_option} đã tải thành công!")
+                source_label = "local" if st.session_state.summarizer.is_local_model else "cache/download"
+                st.success(f"✅ {model_option} đã tải thành công từ nguồn {source_label}!")
+                st.caption(f"Nguồn đang dùng: {st.session_state.summarizer.model_source}")
                 if st.session_state.summarizer.max_tokens != max_tokens:
                     st.info(
                         f"Mô hình này chỉ hỗ trợ tối đa {st.session_state.summarizer.max_tokens} token mỗi chunk. "
@@ -297,7 +311,9 @@ elif page == "🔧 Công Cụ":
         # Current model status
         st.markdown("---")
         if st.session_state.summarizer:
-            st.success(f"✅ Mô hình đã sẵn sàng")
+            current_source = "local" if st.session_state.summarizer.is_local_model else "cache/download"
+            st.success(f"✅ Mô hình đã sẵn sàng ({current_source})")
+            st.caption(f"Đường dẫn/nguồn hiện tại: {st.session_state.summarizer.model_source}")
         else:
             st.warning("⚠️ Chưa tải mô hình")
     

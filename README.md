@@ -69,6 +69,49 @@ streamlit run app.py
 
 App local mặc định mở tại `http://localhost:8501`.
 
+## Dùng model local thay vì cache
+
+Hệ thống hiện ưu tiên tải model theo thứ tự sau:
+
+1. Thư mục `models/` trong project
+2. Cache Hugging Face sẵn có
+3. Tải mới từ Hugging Face
+
+Bạn có thể chép model đã tải sẵn vào project theo cấu trúc này:
+
+```text
+text_summarization_system/
+├── models/
+│   ├── t5-small/
+│   │   ├── config.json
+│   │   ├── tokenizer_config.json
+│   │   ├── spiece.model
+│   │   └── ...
+│   └── facebook/
+│       └── bart-large-cnn/
+│           ├── config.json
+│           ├── tokenizer_config.json
+│           ├── merges.txt
+│           ├── vocab.json
+│           └── ...
+├── app.py
+├── summarizer.py
+├── requirements.txt
+└── README.md
+```
+
+Nếu bạn đã từng tải model bằng Hugging Face, trên Windows thường có thể lấy từ cache tại:
+
+- `C:\Users\<ten-ban>\.cache\huggingface\hub\models--t5-small\snapshots\<hash>\`
+- `C:\Users\<ten-ban>\.cache\huggingface\hub\models--facebook--bart-large-cnn\snapshots\<hash>\`
+
+Chỉ cần copy toàn bộ file trong thư mục snapshot tương ứng vào:
+
+- `models/t5-small/`
+- `models/facebook/bart-large-cnn/`
+
+Sau đó ứng dụng sẽ tự ưu tiên dùng bản local này và không cần tải lại bản khác nếu thư mục model local đã đầy đủ.
+
 ## Cấu trúc dự án
 
 ```text

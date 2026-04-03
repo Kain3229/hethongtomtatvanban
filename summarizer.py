@@ -7,6 +7,7 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 import nltk
@@ -16,6 +17,19 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+LOCAL_MODELS_ROOT = PROJECT_ROOT / "models"
+LOCAL_MODEL_MARKER_FILES = (
+    "config.json",
+    "generation_config.json",
+    "model.safetensors",
+    "pytorch_model.bin",
+    "sentencepiece.bpe.model",
+    "spiece.model",
+    "tokenizer.json",
+    "tokenizer_config.json",
+)
 
 SUMMARY_STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "because", "been", "before",
@@ -56,6 +70,55 @@ class DocumentProfile:
     cue_terms: set[str]
 
 
+def get_local_models_root() -> Path:
+    return LOCAL_MODELS_ROOT
+
+
+def _is_complete_local_model_dir(path: Path) -> bool:
+    if not path.exists() or not path.is_dir():
+        return False
+    return any((path / marker).exists() for marker in LOCAL_MODEL_MARKER_FILES)
+
+
+def find_local_model_dir(model_name: str) -> Path | None:
+    normalized_name = model_name.strip().replace("\\", "/")
+    if not normalized_name:
+        return None
+
+    candidates: list[Path] = []
+
+    direct_path = Path(normalized_name)
+    if direct_path.exists():
+        candidates.append(direct_path.resolve())
+
+    project_relative_path = (PROJECT_ROOT / normalized_name).resolve()
+    if project_relative_path.exists():
+        candidates.append(project_relative_path)
+
+    model_parts = [part for part in normalized_name.split("/") if part]
+    if model_parts:
+        candidates.append((LOCAL_MODELS_ROOT.joinpath(*model_parts)).resolve())
+        candidates.append((LOCAL_MODELS_ROOT / normalized_name.replace("/", "--")).resolve())
+
+    seen_paths = set()
+    for candidate in candidates:
+        candidate_key = str(candidate)
+        if candidate_key in seen_paths:
+            continue
+        seen_paths.add(candidate_key)
+        if _is_complete_local_model_dir(candidate):
+            return candidate
+
+    return None
+
+
+def resolve_model_source(model_name: str) -> tuple[str, str]:
+    local_model_dir = find_local_model_dir(model_name)
+    if local_model_dir is not None:
+        return str(local_model_dir), "local"
+    return model_name, "huggingface"
+
+
 class TextSummarizer:
     """
     Lớp xử lý tóm tắt văn bản với chia nhỏ tự động cho văn bản dài.
@@ -70,16 +133,26 @@ class TextSummarizer:
             max_tokens: Số token tối đa mỗi chunk (mặc định: 1024)
         """
         self.model_name = model_name
+        self.model_source, self.model_source_type = resolve_model_source(model_name)
+        self.is_local_model = self.model_source_type == "local"
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         logger.info(f"Đang tải mô hình: {model_name}")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if self.is_local_model:
+            logger.info("Phát hiện model local tại: %s", self.model_source)
+        else:
+            logger.info("Không tìm thấy model local cho %s, sẽ dùng cache/download của Hugging Face", model_name)
+
+        load_kwargs = {"local_files_only": True} if self.is_local_model else {}
+
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_source, **load_kwargs)
         self.max_tokens = min(max_tokens, self._get_model_token_limit(max_tokens))
         self.chunk_token_limit = self._get_chunk_token_limit()
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_source, **load_kwargs)
         self.model.to(self.device)
         self.model.eval()
-        logger.info(f"Mô hình đã tải trên thiết bị: {self.device}")
+        logger.info("Mô hình đã tải trên thiết bị: %s", self.device)
+        logger.info("Nguồn mô hình đang dùng: %s (%s)", self.model_source, self.model_source_type)
 
     def _get_model_token_limit(self, fallback_tokens: int) -> int:
         model_limit = getattr(self.tokenizer, 'model_max_length', fallback_tokens)
